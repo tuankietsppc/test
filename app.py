@@ -3,6 +3,7 @@ import pandas as pd # type: ignore
 import plotly.express as px # type: ignore
 import numpy as np # type: ignore
 import io
+import os
 from fpdf import FPDF # type: ignore
 import plotly.io as pio # type: ignore
 import tempfile
@@ -73,6 +74,7 @@ if tep_tai_len:
     du_lieu = pd.read_excel(tep_tai_len, engine='openpyxl')  # Đọc dữ liệu Excel
     du_lieu_goc = du_lieu.copy()  # Sao lưu dữ liệu gốc để sử dụng sau này
 
+
     # === LỌC DỮ LIỆU TRONG THANH BÊN ===
     st.sidebar.header("🎯 Bộ lọc dữ liệu")  # Tiêu đề bộ lọc ở sidebar
 
@@ -124,6 +126,8 @@ if tep_tai_len:
         else:
             dan_toc_chon = "Không có cột DT"
 
+        
+
         # Hiển thị lựa chọn đã chọn
         st.write("Bạn đã chọn:")
         st.markdown(f"- **Đơn vị:** {don_vi_chon}")
@@ -138,6 +142,8 @@ if tep_tai_len:
     st.dataframe(du_lieu)  # Hiển thị bảng dữ liệu đã lọc
     so_dong_du_lieu = du_lieu.shape[0]  # Lấy số dòng dữ liệu
     st.write(f"Số dòng của bảng là: {so_dong_du_lieu}")  # Hiển thị số dòng
+
+    
 
     # === PHÂN TÍCH KHOẢNG ĐIỂM CÁC MÔN ===
     st.sidebar.markdown("---")  # Dòng kẻ ngăn cách trong sidebar
@@ -189,7 +195,7 @@ if tep_tai_len:
         bang_thong_ke["Thứ tự"] = bang_thong_ke["Khoảng điểm"].map(thu_tu_bang)  # Gán thứ tự sắp xếp
         bang_thong_ke = bang_thong_ke.sort_values("Thứ tự").drop(columns=["Thứ tự"])  # Sắp xếp và bỏ cột thứ tự
 
-        st.markdown("#### 📄 Bảng thống kê số lượng theo khoảng điểm")
+        st.markdown("#### 📄 Thống kê số lượng theo khoảng điểm")
         st.dataframe(bang_thong_ke, use_container_width=True)  # Hiển thị bảng thống kê
 
         # Dữ liệu chuẩn bị cho biểu đồ
@@ -213,10 +219,47 @@ if tep_tai_len:
                        title=f"Biểu đồ tròn: {mon_chon}"),
                 use_container_width=True
             )  # Biểu đồ tròn tỉ lệ học sinh theo khoảng điểm
+        
+      
+        if all(cot in du_lieu_goc.columns for cot in danh_sach_mon.values()):
+            # Tính điểm trung bình theo môn trong dữ liệu gốc (tất cả đơn vị)
+            diem_trung_binh_goc = {}
+            for mon, cot in danh_sach_mon.items():
+                diem_trung_binh_goc[mon] = pd.to_numeric(du_lieu_goc[cot], errors='coerce').mean()
 
+            # Tính điểm trung bình theo môn trong dữ liệu đã lọc
+            diem_trung_binh_loc = {}
+            for mon, cot in danh_sach_mon.items():
+                if cot in du_lieu.columns:
+                    diem_trung_binh_loc[mon] = pd.to_numeric(du_lieu[cot], errors='coerce').mean()
+                else:
+                    diem_trung_binh_loc[mon] = np.nan
+
+            # Chuẩn bị dataframe để vẽ biểu đồ sin so sánh
+            df_sin_compare = pd.DataFrame({
+                "Môn học": list(danh_sach_mon.keys()),
+                "Điểm trung bình - Tất cả đơn vị": list(diem_trung_binh_goc.values()),
+                "Điểm trung bình - Đã lọc": list(diem_trung_binh_loc.values())
+            })
+
+            # Vẽ biểu đồ đường so sánh điểm trung bình
+            fig_sin = px.line(
+                df_sin_compare,
+                x="Môn học",
+                y=["Điểm trung bình - Tất cả đơn vị", "Điểm trung bình - Đã lọc"],
+                title="So sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc",
+                markers=True,
+                labels={"value": "Điểm trung bình", "Môn học": "Môn học"},
+            )
+
+            st.plotly_chart(fig_sin, use_container_width=True)
+        else:
+            st.info("Không đủ dữ liệu để vẽ biểu đồ so sánh điểm trung bình giữa các đơn vị.")
+
+
+        
         # Nếu có cột 'DONVI' thì vẽ biểu đồ so sánh theo đơn vị
         if "DONVI" in du_lieu_loc.columns:
-            st.markdown("### 📈 Biểu đồ so sánh tỷ lệ học sinh theo khoảng điểm theo từng đơn vị")
 
             tong_hoc_sinh_theo_don_vi = du_lieu_loc.groupby("DONVI").size().reset_index(name="Tổng học sinh")  # Tổng số học sinh theo đơn vị
             so_luong_theo_khoang_va_don_vi = du_lieu_loc.groupby(["DONVI", "Khoảng điểm"]).size().reset_index(name="Số lượng")  # Số lượng theo đơn vị và khoảng điểm
@@ -243,20 +286,23 @@ if tep_tai_len:
         else:
             st.info("Dữ liệu không có cột 'DONVI', không thể hiển thị biểu đồ so sánh theo đơn vị.")
        
-        def tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, fig_compare, mon_hoc):
+        def tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, fig_compare, fig_sin, mon_hoc):
             pdf = FPDF()
             pdf.add_page()
 
-            # Thêm font DejaVuUnicode (cần có font này trong thư mục fonts)
+            # Thêm font DejaVuUnicode (cần có file font trong thư mục chạy app)
             font_path = "DejaVuSans.ttf"
-            pdf.add_font("DejaVu", "", font_path, uni=True)
-            pdf.set_font("DejaVu", size=14)
+            if os.path.exists(font_path):
+                pdf.add_font("DejaVu", "", font_path, uni=True)
+                pdf.set_font("DejaVu", size=14)
+            else:
+                pdf.set_font("Arial", size=14)
 
             pdf.cell(0, 10, f"Báo cáo thống kê môn {mon_hoc}", ln=True, align="C")
             pdf.ln(10)
 
             # Viết bảng thống kê
-            pdf.set_font("DejaVu", size=12)
+            pdf.set_font("DejaVu" if os.path.exists(font_path) else "Arial", size=12)
             pdf.cell(50, 10, "Khoảng điểm", border=1)
             pdf.cell(40, 10, "Số lượng", border=1, ln=True)
             for _, row in bang_thong_ke.iterrows():
@@ -265,33 +311,49 @@ if tep_tai_len:
 
             pdf.ln(10)
 
-            # Chuẩn bị biểu đồ có nền trắng và viền rõ ràng
-            for fig in [fig_bar, fig_pie, fig_compare]:
+            # Cập nhật background cho biểu đồ trắng, viền rõ
+            for fig in [fig_bar, fig_pie, fig_compare, fig_sin]:
                 fig.update_layout(plot_bgcolor='white', paper_bgcolor='white')
             fig_pie.update_traces(marker=dict(line=dict(color='white', width=2)))
 
-            # Xuất ảnh png bytes
-            img_bytes_bar = pio.to_image(fig_bar, format="png")
-            img_bytes_pie = pio.to_image(fig_pie, format="png")
-            img_bytes_compare = pio.to_image(fig_compare, format="png")
+            # Hàm hỗ trợ lưu ảnh Plotly ra file tạm và trả về đường dẫn file
+            def save_fig_tmp(fig, prefix="plotly", ext=".png"):
+                with tempfile.NamedTemporaryFile(prefix=prefix, suffix=ext, delete=False) as tmp_file:
+                    img_bytes = pio.to_image(fig, format="png")
+                    tmp_file.write(img_bytes)
+                    return tmp_file.name
+
+            # Lưu từng biểu đồ ra file tạm
+            img_bar_path = save_fig_tmp(fig_bar, prefix="bar_")
+            img_pie_path = save_fig_tmp(fig_pie, prefix="pie_")
+            img_compare_path = save_fig_tmp(fig_compare, prefix="compare_")
+            img_sin_path = save_fig_tmp(fig_sin, prefix="sin_")
 
             # Chèn ảnh biểu đồ cột
             pdf.cell(0, 10, "Biểu đồ cột:", ln=True)
-            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
-                tmp_file.write(img_bytes_bar)
-                tmp_file_path = tmp_file.name
-            pdf.image(io.BytesIO(img_bytes_bar), x=10, w=180)
+            pdf.image(img_bar_path, x=10, w=180)
             pdf.ln(80)
 
             # Chèn ảnh biểu đồ tròn
             pdf.cell(0, 10, "Biểu đồ tròn:", ln=True)
-            pdf.image(io.BytesIO(img_bytes_pie), x=10, w=180)
+            pdf.image(img_pie_path, x=10, w=180)
             pdf.ln(80)
 
-            # Chèn ảnh biểu đồ so sánh tỉ lệ theo đơn vị
+            # Chèn ảnh biểu đồ so sánh tỷ lệ học sinh theo đơn vị
             pdf.cell(0, 10, "Biểu đồ so sánh tỷ lệ học sinh theo đơn vị:", ln=True)
-            pdf.image(io.BytesIO(img_bytes_compare), x=10, w=180)
+            pdf.image(img_compare_path, x=10, w=180)
             pdf.ln(80)
+
+            # Chèn ảnh biểu đồ so sánh điểm trung bình (biểu đồ sin)
+            pdf.cell(0, 10, "Biểu đồ so sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc:", ln=True)
+            pdf.image(img_sin_path, x=10, w=180)
+            pdf.ln(80)
+
+            # Xóa file tạm sau khi chèn
+            os.remove(img_bar_path)
+            os.remove(img_pie_path)
+            os.remove(img_compare_path)
+            os.remove(img_sin_path)
 
             # Xuất PDF ra bytes
             pdf_output = bytes(pdf.output(dest='S'))
@@ -299,7 +361,9 @@ if tep_tai_len:
 
 
 
+
         if st.button("📄 Tạo báo cáo PDF"):
+            # Biểu đồ cột
             fig_bar = px.bar(
                 du_lieu_bieu_do,
                 x="Khoảng điểm",
@@ -310,6 +374,7 @@ if tep_tai_len:
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
 
+            # Biểu đồ tròn
             fig_pie = px.pie(
                 du_lieu_bieu_do,
                 names="Khoảng điểm",
@@ -318,7 +383,7 @@ if tep_tai_len:
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
 
-            # Tạo biểu đồ so sánh tỉ lệ theo đơn vị nếu có
+            # Biểu đồ so sánh tỷ lệ theo đơn vị
             if "DONVI" in du_lieu_loc.columns:
                 bieu_do_compare = px.bar(
                     du_lieu_ghep,
@@ -330,21 +395,22 @@ if tep_tai_len:
                     labels={"DONVI": "Đơn vị", "Tỷ lệ (%)": "Tỷ lệ học sinh (%)"},
                     color_discrete_sequence=px.colors.qualitative.Set2,
                 )
-                
-                bieu_do_compare.update_layout(
-                    barmode='stack',
-                    xaxis=dict(
-                        tickfont=dict(size=8)  # Cỡ chữ trục x (Đơn vị)
-                    )
-                )
-                
+                bieu_do_compare.update_layout(barmode='stack', xaxis=dict(tickfont=dict(size=8)))
             else:
-                # Nếu không có cột DONVI thì tạo biểu đồ rỗng hoặc mặc định
-                bieu_do_compare = px.bar(
-                    title="Không có dữ liệu so sánh theo đơn vị"
-                )
+                bieu_do_compare = px.bar(title="Không có dữ liệu so sánh theo đơn vị")
 
-            pdf_data = tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, bieu_do_compare, mon_chon)
+            # Biểu đồ sin so sánh điểm trung bình
+            fig_sin = px.line(
+                df_sin_compare,
+                x="Môn học",
+                y=["Điểm trung bình - Tất cả đơn vị", "Điểm trung bình - Đã lọc"],
+                title="So sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc",
+                markers=True,
+                labels={"value": "Điểm trung bình", "Môn học": "Môn học"},
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+
+            pdf_data = tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, bieu_do_compare, fig_sin, mon_chon)
 
             st.download_button(
                 label="📥 Tải file PDF báo cáo",
@@ -352,3 +418,4 @@ if tep_tai_len:
                 file_name="bao_cao_phan_tich_diem.pdf",
                 mime="application/pdf",
             )
+
