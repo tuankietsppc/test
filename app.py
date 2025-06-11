@@ -136,6 +136,8 @@ if tep_tai_len:
     st.write(f"Số dòng của bảng là: {so_dong_du_lieu}")  # Hiển thị số dòng
 
     # === PHÂN TÍCH KHOẢNG ĐIỂM CÁC MÔN ===
+    st.sidebar.markdown("---")  # Dòng kẻ ngăn cách trong sidebar
+    st.sidebar.subheader("📚 Phân tích khoảng điểm theo môn")  # Tiêu đề phụ trong sidebar
 
     danh_sach_mon = {
         "Ngữ Văn": "DTNGUVANIN",
@@ -171,8 +173,6 @@ if tep_tai_len:
 
         du_lieu_loc = du_lieu[du_lieu["Khoảng điểm"].isin(khoang_chon)]  # Lọc dữ liệu theo khoảng điểm đã chọn
 
-        st.markdown(f"### 📊 Phân tích khoảng điểm môn **{mon_chon}**")  # Tiêu đề phân tích
-        st.write(f"Số học sinh sau khi lọc khoảng điểm: **{du_lieu_loc.shape[0]}**")  # Hiển thị số học sinh
 
         # Tạo bảng thống kê số lượng học sinh theo khoảng điểm
         bang_thong_ke = du_lieu_loc["Khoảng điểm"].value_counts().reset_index()
