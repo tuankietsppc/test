@@ -70,13 +70,18 @@ div[data-baseweb="select"], div[data-baseweb="radio"], div[data-baseweb="checkbo
 
 # === TẢI FILE EXCEL ===
 tep_tai_len = st.file_uploader(
-    '📤 Chọn file Excel',
-    type='xlsx')  # Tải lên file Excel
+    '📤 Chọn file Excel hoặc CSV',
+    type=['xlsx', 'csv'])  # Cho phép tải lên cả hai định dạng
+
 
 if tep_tai_len:
-    du_lieu = pd.read_excel(
-        tep_tai_len,
-        engine='openpyxl')  # Đọc dữ liệu Excel
+    if tep_tai_len.name.endswith('.xlsx'):
+        du_lieu = pd.read_excel(tep_tai_len, engine='openpyxl')
+    elif tep_tai_len.name.endswith('.csv'):
+        du_lieu = pd.read_csv(tep_tai_len, encoding='utf-8')  # Hoặc encoding='utf-8-sig' nếu lỗi font
+    else:
+        st.error("Định dạng file không hợp lệ. Chỉ hỗ trợ .xlsx và .csv.")
+        st.stop()
     du_lieu_goc = du_lieu.copy()  # Sao lưu dữ liệu gốc để sử dụng sau này
 
     # === LỌC DỮ LIỆU TRONG THANH BÊN ===
@@ -352,14 +357,14 @@ if tep_tai_len:
             pdf.cell(
                 0,
                 12,
-                f"BÁO CÁO PHÂN TÍCH MÔN {
-                    mon_hoc.upper()}",
+                f"BÁO CÁO PHÂN TÍCH MÔN {mon_hoc.upper()}",
                 ln=True,
                 align="C")
+
             pdf.ln(8)
 
             # ===== Tiêu đề bảng thống kê =====
-            pdf.set_font(font_name, style="B", size=14)
+            pdf.set_font(font_name, style="B", size=11)
             pdf.cell(
                 0,
                 10,
@@ -397,7 +402,7 @@ if tep_tai_len:
                     line=dict(
                         color='white',
                         width=2)))
-
+            
             # Hàm lưu biểu đồ tạm
             def save_fig_tmp(fig, prefix="plotly", ext=".png"):
                 with tempfile.NamedTemporaryFile(prefix=prefix, suffix=ext, delete=False) as tmp_file:
@@ -413,9 +418,9 @@ if tep_tai_len:
             img_sin_path = save_fig_tmp(fig_sin, prefix="sin_")
 
             # Hàm chèn biểu đồ
-            def chen_bieu_do(pdf, title, img_path):
+            def chen_bieu_do(pdf, img_path):
                 pdf.set_font(font_name, style="B", size=13)
-                pdf.cell(0, 10, title, ln=True, align="C")
+                pdf.cell(0, 10, ln=True, align="C")
                 pdf.ln(4)
                 img_width = 180
                 x_img = (210 - img_width) / 2
@@ -423,15 +428,13 @@ if tep_tai_len:
                 pdf.ln(12)
 
             # Chèn các biểu đồ
-            chen_bieu_do(pdf, "Biểu đồ cột phân bố khoảng điểm", img_bar_path)
-            chen_bieu_do(pdf, "Biểu đồ tròn tỷ lệ học sinh", img_pie_path)
+            chen_bieu_do(pdf, img_bar_path)
+            chen_bieu_do(pdf, img_pie_path)
             chen_bieu_do(
                 pdf,
-                "So sánh tỷ lệ học sinh theo đơn vị",
                 img_compare_path)
             chen_bieu_do(
                 pdf,
-                "So sánh điểm trung bình các đơn vị",
                 img_sin_path)
 
             # Xoá file tạm
@@ -458,47 +461,60 @@ if tep_tai_len:
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
 
+            # Cập nhật style cho tiêu đề
+            fig_bar.update_layout(
+                title=dict(
+                    text=f"<b>Biểu đồ cột: {mon_chon}</b>",  # Thẻ <b> giúp in đậm
+                    x=0.5,  # canh giữa tiêu đề
+                    xanchor='center'
+                )
+            )
+
             # Biểu đồ tròn
             fig_pie = px.pie(
                 du_lieu_bieu_do,
                 names="Khoảng điểm",
                 values="Số lượng",
-                title=f"Biểu đồ tròn: {mon_chon}",
+                title=f"<b>Biểu đồ tròn: {mon_chon}</b>",
                 color_discrete_sequence=px.colors.qualitative.Set2,
             )
+            fig_pie.update_layout(
+                title=dict(x=0.5, xanchor="center")
+            )
 
-            # Biểu đồ so sánh tỷ lệ theo đơn vị
             if "DONVI" in du_lieu_loc.columns:
                 bieu_do_compare = px.bar(
                     du_lieu_ghep,
                     x="DONVI",
                     y="Tỷ lệ (%)",
                     color="Khoảng điểm",
-                    category_orders={
-                        "Khoảng điểm": thu_tu_bang.keys()},
-                    title=f"Tỷ lệ % học sinh theo khoảng điểm môn {mon_chon} phân theo Đơn vị",
-                    labels={
-                        "DONVI": "Đơn vị",
-                        "Tỷ lệ (%)": "Tỷ lệ học sinh (%)"},
+                    category_orders={"Khoảng điểm": thu_tu_bang.keys()},
+                    title=f"<b>Tỷ lệ % học sinh theo khoảng điểm môn {mon_chon} phân theo Đơn vị</b>",
+                    labels={"DONVI": "Đơn vị", "Tỷ lệ (%)": "Tỷ lệ học sinh (%)"},
                     color_discrete_sequence=px.colors.qualitative.Set2,
                 )
                 bieu_do_compare.update_layout(
-                    barmode='stack', xaxis=dict(
-                        tickfont=dict(
-                            size=8)))
+                    barmode='stack',
+                    xaxis=dict(tickfont=dict(size=8)),
+                    title=dict(x=0.5, xanchor="center")
+                )
             else:
                 bieu_do_compare = px.bar(
-                    title="Không có dữ liệu so sánh theo đơn vị")
+                    title="<b>Không có dữ liệu so sánh theo đơn vị</b>")
+                bieu_do_compare.update_layout(title=dict(x=0.5, xanchor="center"))
 
             # Biểu đồ sin so sánh điểm trung bình
             fig_sin = px.line(
                 df_sin_compare,
                 x="Môn học",
                 y=["Điểm trung bình - Tất cả đơn vị", "Điểm trung bình - Đã lọc"],
-                title="So sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc",
+                title="<b>So sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc</b>",
                 markers=True,
                 labels={"value": "Điểm trung bình", "Môn học": "Môn học"},
                 color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+            fig_sin.update_layout(
+                title=dict(x=0.5, xanchor="center")
             )
 
             pdf_data = tao_pdf_bao_cao(
