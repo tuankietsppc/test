@@ -1,7 +1,10 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import numpy as np
+import streamlit as st # type: ignore
+import pandas as pd # type: ignore
+import plotly.express as px # type: ignore
+import numpy as np # type: ignore
+import io
+from fpdf import FPDF # type: ignore
+import plotly.io as pio # type: ignore
 
 # Thiết lập tiêu đề và bố cục trang
 st.set_page_config(page_title='Phân tích điểm thi', layout="wide")  # Đặt tiêu đề trang và chế độ bố cục rộng
@@ -238,3 +241,110 @@ if tep_tai_len:
             st.plotly_chart(bieu_do, use_container_width=True)
         else:
             st.info("Dữ liệu không có cột 'DONVI', không thể hiển thị biểu đồ so sánh theo đơn vị.")
+       
+        def tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, fig_compare, mon_hoc):
+            pdf = FPDF()
+            pdf.add_page()
+
+            # Thêm font DejaVuUnicode (cần có font này trong thư mục fonts)
+            font_path = "fonts/DejaVuSans.ttf"
+            pdf.add_font("DejaVu", "", font_path, uni=True)
+            pdf.set_font("DejaVu", size=14)
+
+            pdf.cell(0, 10, f"Báo cáo thống kê môn {mon_hoc}", ln=True, align="C")
+            pdf.ln(10)
+
+            # Viết bảng thống kê
+            pdf.set_font("DejaVu", size=12)
+            pdf.cell(50, 10, "Khoảng điểm", border=1)
+            pdf.cell(40, 10, "Số lượng", border=1, ln=True)
+            for _, row in bang_thong_ke.iterrows():
+                pdf.cell(50, 10, str(row["Khoảng điểm"]), border=1)
+                pdf.cell(40, 10, str(row["Số lượng"]), border=1, ln=True)
+
+            pdf.ln(10)
+
+            # Chuẩn bị biểu đồ có nền trắng và viền rõ ràng
+            for fig in [fig_bar, fig_pie, fig_compare]:
+                fig.update_layout(plot_bgcolor='white', paper_bgcolor='white')
+            fig_pie.update_traces(marker=dict(line=dict(color='white', width=2)))
+
+            # Xuất ảnh png bytes
+            img_bytes_bar = pio.to_image(fig_bar, format="png")
+            img_bytes_pie = pio.to_image(fig_pie, format="png")
+            img_bytes_compare = pio.to_image(fig_compare, format="png")
+
+            # Chèn ảnh biểu đồ cột
+            pdf.cell(0, 10, "Biểu đồ cột:", ln=True)
+            pdf.image(io.BytesIO(img_bytes_bar), x=10, w=180)
+            pdf.ln(80)
+
+            # Chèn ảnh biểu đồ tròn
+            pdf.cell(0, 10, "Biểu đồ tròn:", ln=True)
+            pdf.image(io.BytesIO(img_bytes_pie), x=10, w=180)
+            pdf.ln(80)
+
+            # Chèn ảnh biểu đồ so sánh tỉ lệ theo đơn vị
+            pdf.cell(0, 10, "Biểu đồ so sánh tỷ lệ học sinh theo đơn vị:", ln=True)
+            pdf.image(io.BytesIO(img_bytes_compare), x=10, w=180)
+            pdf.ln(80)
+
+            # Xuất PDF ra bytes
+            pdf_output = bytes(pdf.output(dest='S'))
+            return pdf_output
+
+
+
+        if st.button("📄 Tạo báo cáo PDF"):
+            fig_bar = px.bar(
+                du_lieu_bieu_do,
+                x="Khoảng điểm",
+                y="Số lượng",
+                color="Khoảng điểm",
+                category_orders={"Khoảng điểm": thu_tu_bang.keys()},
+                title=f"Biểu đồ cột: {mon_chon}",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+
+            fig_pie = px.pie(
+                du_lieu_bieu_do,
+                names="Khoảng điểm",
+                values="Số lượng",
+                title=f"Biểu đồ tròn: {mon_chon}",
+                color_discrete_sequence=px.colors.qualitative.Set2,
+            )
+
+            # Tạo biểu đồ so sánh tỉ lệ theo đơn vị nếu có
+            if "DONVI" in du_lieu_loc.columns:
+                bieu_do_compare = px.bar(
+                    du_lieu_ghep,
+                    x="DONVI",
+                    y="Tỷ lệ (%)",
+                    color="Khoảng điểm",
+                    category_orders={"Khoảng điểm": thu_tu_bang.keys()},
+                    title=f"Tỷ lệ % học sinh theo khoảng điểm môn {mon_chon} phân theo Đơn vị",
+                    labels={"DONVI": "Đơn vị", "Tỷ lệ (%)": "Tỷ lệ học sinh (%)"},
+                    color_discrete_sequence=px.colors.qualitative.Set2,
+                )
+                
+                bieu_do_compare.update_layout(
+                    barmode='stack',
+                    xaxis=dict(
+                        tickfont=dict(size=8)  # Cỡ chữ trục x (Đơn vị)
+                    )
+                )
+                
+            else:
+                # Nếu không có cột DONVI thì tạo biểu đồ rỗng hoặc mặc định
+                bieu_do_compare = px.bar(
+                    title="Không có dữ liệu so sánh theo đơn vị"
+                )
+
+            pdf_data = tao_pdf_bao_cao(bang_thong_ke, fig_bar, fig_pie, bieu_do_compare, mon_chon)
+
+            st.download_button(
+                label="📥 Tải file PDF báo cáo",
+                data=pdf_data,
+                file_name="bao_cao_phan_tich_diem.pdf",
+                mime="application/pdf",
+            )
