@@ -81,28 +81,32 @@ if tep_tai_len:
     # Kiểm tra đủ cột cần thiết
     if all(cot in du_lieu.columns for cot in ["DONVI", "TRUONG", "LOP"]):
         # Lọc Đơn vị
-        ds_don_vi = du_lieu["DONVI"].dropna().unique().tolist()  # Lấy danh sách đơn vị không trùng
-        ds_don_vi.insert(0, "Tất cả")  # Thêm tùy chọn 'Tất cả' lên đầu
-        don_vi_chon = st.sidebar.selectbox("Chọn đơn vị", ds_don_vi)  # Tạo dropdown chọn đơn vị
+        ds_don_vi = du_lieu_goc["DONVI"].dropna().unique().tolist()
+        ds_don_vi.insert(0, "Tất cả")
+        don_vi_chon = st.sidebar.selectbox("Chọn đơn vị", ds_don_vi)
 
+        du_lieu_don_vi = du_lieu_goc.copy()
         if don_vi_chon != "Tất cả":
-            du_lieu = du_lieu[du_lieu["DONVI"] == don_vi_chon]  # Lọc dữ liệu theo đơn vị chọn
+            du_lieu_don_vi = du_lieu_don_vi[du_lieu_don_vi["DONVI"] == don_vi_chon]
 
-        # Lọc Trường
-        ds_truong = du_lieu["TRUONG"].dropna().unique().tolist()
+        # Lọc Trường (sau khi lọc đơn vị)
+        ds_truong = du_lieu_don_vi["TRUONG"].dropna().unique().tolist()
         ds_truong.insert(0, "Tất cả")
         truong_chon = st.sidebar.selectbox("Chọn trường", ds_truong)
 
+        du_lieu_truong = du_lieu_don_vi.copy()
         if truong_chon != "Tất cả":
-            du_lieu = du_lieu[du_lieu["TRUONG"] == truong_chon]
+            du_lieu_truong = du_lieu_truong[du_lieu_truong["TRUONG"] == truong_chon]
 
-        # Lọc Lớp
-        ds_lop = du_lieu["LOP"].dropna().unique().tolist()
+        # Lọc Lớp (sau khi lọc trường)
+        ds_lop = du_lieu_truong["LOP"].dropna().unique().tolist()
         ds_lop.insert(0, "Tất cả")
         lop_chon = st.sidebar.selectbox("Chọn lớp", ds_lop)
 
+        du_lieu = du_lieu_truong.copy()
         if lop_chon != "Tất cả":
             du_lieu = du_lieu[du_lieu["LOP"] == lop_chon]
+
 
         # Lọc Giới tính (nếu có cột)
         if "GT" in du_lieu.columns:
