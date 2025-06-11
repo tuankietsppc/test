@@ -247,7 +247,7 @@ if tep_tai_len:
             pdf.add_page()
 
             # Thêm font DejaVuUnicode (cần có font này trong thư mục fonts)
-            font_path = "fonts/DejaVuSans.ttf"
+            font_path = "DejaVuSans.ttf"
             pdf.add_font("DejaVu", "", font_path, uni=True)
             pdf.set_font("DejaVu", size=14)
 
