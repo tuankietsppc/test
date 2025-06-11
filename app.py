@@ -294,70 +294,74 @@ if tep_tai_len:
             pdf = FPDF()
             pdf.add_page()
 
-            # Thêm font DejaVuUnicode (cần có file font trong thư mục chạy app)
+            # Cấu hình font
             font_path = "DejaVuSans.ttf"
             if os.path.exists(font_path):
                 pdf.add_font("DejaVu", "", font_path, uni=True)
                 pdf.set_font("DejaVu", size=14)
+                font_name = "DejaVu"
             else:
                 pdf.set_font("Arial", size=14)
+                font_name = "Arial"
 
+            # Tiêu đề căn giữa
             pdf.cell(0, 10, f"Báo cáo thống kê môn {mon_hoc}", ln=True, align="C")
             pdf.ln(10)
 
-            # Viết bảng thống kê
-            pdf.set_font("DejaVu" if os.path.exists(font_path) else "Arial", size=12)
-            pdf.cell(50, 10, "Khoảng điểm", border=1)
-            pdf.cell(40, 10, "Số lượng", border=1, ln=True)
+            # Bảng thống kê căn giữa
+            pdf.set_font(font_name, size=12)
+            col1_w = 60
+            col2_w = 40
+            total_table_width = col1_w + col2_w
+            x_start = (210 - total_table_width) / 2
+            pdf.set_x(x_start)
+            pdf.cell(col1_w, 10, "Khoảng điểm", border=1, align='C')
+            pdf.cell(col2_w, 10, "Số lượng", border=1, ln=True, align='C')
+
             for _, row in bang_thong_ke.iterrows():
-                pdf.cell(50, 10, str(row["Khoảng điểm"]), border=1)
-                pdf.cell(40, 10, str(row["Số lượng"]), border=1, ln=True)
+                pdf.set_x(x_start)
+                pdf.cell(col1_w, 10, str(row["Khoảng điểm"]), border=1, align='C')
+                pdf.cell(col2_w, 10, str(row["Số lượng"]), border=1, ln=True, align='C')
 
             pdf.ln(10)
 
-            # Cập nhật background cho biểu đồ trắng, viền rõ
+            # Đặt nền trắng cho biểu đồ
             for fig in [fig_bar, fig_pie, fig_compare, fig_sin]:
                 fig.update_layout(plot_bgcolor='white', paper_bgcolor='white')
             fig_pie.update_traces(marker=dict(line=dict(color='white', width=2)))
 
-            # Hàm hỗ trợ lưu ảnh Plotly ra file tạm và trả về đường dẫn file
+            # Hàm lưu biểu đồ thành ảnh
             def save_fig_tmp(fig, prefix="plotly", ext=".png"):
                 with tempfile.NamedTemporaryFile(prefix=prefix, suffix=ext, delete=False) as tmp_file:
-                    img_bytes = pio.to_image(fig, format="png")
+                    img_bytes = pio.to_image(fig, format="png", width=800, height=500)
                     tmp_file.write(img_bytes)
                     return tmp_file.name
 
-            # Lưu từng biểu đồ ra file tạm
+            # Lưu hình
             img_bar_path = save_fig_tmp(fig_bar, prefix="bar_")
             img_pie_path = save_fig_tmp(fig_pie, prefix="pie_")
             img_compare_path = save_fig_tmp(fig_compare, prefix="compare_")
             img_sin_path = save_fig_tmp(fig_sin, prefix="sin_")
 
-            # Chèn ảnh biểu đồ cột
-            pdf.cell(0, 10, "Biểu đồ cột:", ln=True)
-            pdf.image(img_bar_path, x=10, w=180)
-            pdf.ln(80)
+            # Hàm chèn biểu đồ với tiêu đề căn giữa
+            def chen_bieu_do(pdf, title, img_path):
+                pdf.set_font(font_name, size=12)
+                pdf.cell(0, 10, title, ln=True, align="C")
+                pdf.ln(3)
+                img_width = 180
+                x_img = (210 - img_width) / 2
+                pdf.image(img_path, x=x_img, w=img_width)
+                pdf.ln(10)
 
-            # Chèn ảnh biểu đồ tròn
-            pdf.cell(0, 10, "Biểu đồ tròn:", ln=True)
-            pdf.image(img_pie_path, x=10, w=180)
-            pdf.ln(80)
+            # Chèn các biểu đồ
+            chen_bieu_do(pdf, "Biểu đồ cột", img_bar_path)
+            chen_bieu_do(pdf, "Biểu đồ tròn", img_pie_path)
+            chen_bieu_do(pdf, "Biểu đồ so sánh tỷ lệ học sinh theo đơn vị", img_compare_path)
+            chen_bieu_do(pdf, "Biểu đồ so sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc", img_sin_path)
 
-            # Chèn ảnh biểu đồ so sánh tỷ lệ học sinh theo đơn vị
-            pdf.cell(0, 10, "Biểu đồ so sánh tỷ lệ học sinh theo đơn vị:", ln=True)
-            pdf.image(img_compare_path, x=10, w=180)
-            pdf.ln(80)
-
-            # Chèn ảnh biểu đồ so sánh điểm trung bình (biểu đồ sin)
-            pdf.cell(0, 10, "Biểu đồ so sánh điểm trung bình giữa tất cả đơn vị và dữ liệu đã lọc:", ln=True)
-            pdf.image(img_sin_path, x=10, w=180)
-            pdf.ln(80)
-
-            # Xóa file tạm sau khi chèn
-            os.remove(img_bar_path)
-            os.remove(img_pie_path)
-            os.remove(img_compare_path)
-            os.remove(img_sin_path)
+            # Xoá file ảnh tạm
+            for path in [img_bar_path, img_pie_path, img_compare_path, img_sin_path]:
+                os.remove(path)
 
             # Xuất PDF ra bytes
             pdf_output = bytes(pdf.output(dest='S'))
