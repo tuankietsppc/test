@@ -5,6 +5,7 @@ import numpy as np # type: ignore
 import io
 from fpdf import FPDF # type: ignore
 import plotly.io as pio # type: ignore
+import tempfile
 
 # Thiết lập tiêu đề và bố cục trang
 st.set_page_config(page_title='Phân tích điểm thi', layout="wide")  # Đặt tiêu đề trang và chế độ bố cục rộng
@@ -276,6 +277,9 @@ if tep_tai_len:
 
             # Chèn ảnh biểu đồ cột
             pdf.cell(0, 10, "Biểu đồ cột:", ln=True)
+            with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_file:
+                tmp_file.write(img_bytes_bar)
+                tmp_file_path = tmp_file.name
             pdf.image(io.BytesIO(img_bytes_bar), x=10, w=180)
             pdf.ln(80)
 
