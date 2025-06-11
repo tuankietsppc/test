@@ -136,8 +136,6 @@ if tep_tai_len:
     st.write(f"Số dòng của bảng là: {so_dong_du_lieu}")  # Hiển thị số dòng
 
     # === PHÂN TÍCH KHOẢNG ĐIỂM CÁC MÔN ===
-    st.sidebar.markdown("---")  # Dòng kẻ ngăn cách trong sidebar
-    st.sidebar.subheader("📚 Phân tích khoảng điểm theo môn")  # Tiêu đề phụ trong sidebar
 
     danh_sach_mon = {
         "Ngữ Văn": "DTNGUVANIN",
