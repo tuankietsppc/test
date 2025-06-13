@@ -4,9 +4,10 @@ import plotly.express as px  # type: ignore
 import numpy as np  # type: ignore
 import io
 import os
-from fpdf import FPDF  # type: ignore
+from fpdf import FPDF # type: ignore
 import plotly.io as pio  # type: ignore
 import tempfile
+from streamlit_chat import message  # type: ignore # Chat UI
 
 # Thiết lập tiêu đề và bố cục trang
 # Đặt tiêu đề trang và chế độ bố cục rộng
@@ -330,7 +331,6 @@ if tep_tai_len:
         else:
             st.info(
                 "Dữ liệu không có cột 'DONVI', không thể hiển thị biểu đồ so sánh theo đơn vị.")
-
         def tao_pdf_bao_cao(
                 bang_thong_ke,
                 fig_bar,
@@ -531,3 +531,120 @@ if tep_tai_len:
                 file_name="bao_cao_phan_tich_diem.pdf",
                 mime="application/pdf",
             )
+
+        st.markdown("---")
+        st.subheader("💬 Trợ lý hướng dẫn sử dụng hệ thống phân tích điểm thi")
+
+        # Khởi tạo session_state lưu hội thoại
+        if "messages" not in st.session_state:
+            st.session_state.messages = [
+                {"role": "assistant", "content": "👋 Xin chào! Tôi là trợ lý hướng dẫn sử dụng hệ thống phân tích điểm thi. Bạn muốn mình hướng dẫn sử dụng chức năng gì?"}
+            ]
+
+        # Hiển thị đoạn hội thoại
+        for i, msg in enumerate(st.session_state.messages):
+            message(msg["content"], is_user=(msg["role"] == "user"), key=f"msg_{i}")
+
+        # === Hàm phản hồi theo hướng dẫn mở rộng ===
+        def guide_bot_reply(text):
+            text = text.lower()
+
+            if "tải báo cáo" in text or "pdf" in text or "xuất file" in text:
+                return (
+                    "📄 Để tải báo cáo:\n"
+                    "1. Cuộn xuống cuối trang.\n"
+                    "2. Nhấn nút **📥 Tải file PDF báo cáo**.\n"
+                    "Hệ thống sẽ tạo một bản báo cáo phân tích chi tiết bạn có thể lưu lại."
+                )
+            elif "điểm trung bình" in text:
+                return (
+                    "📊 Để xem điểm trung bình các môn:\n"
+                    "1. Hệ thống hiển thị bảng điểm tổng hợp.\n"
+                    "2. Dưới bảng có biểu đồ so sánh điểm trung bình giữa các môn.\n"
+                    "3. Có thể lọc theo đơn vị, trường, lớp, khối hoặc giới tính để so sánh chi tiết hơn."
+                )
+            elif "phân tích khoảng điểm" in text or "thống kê" in text:
+                return (
+                    "📚 Để phân tích khoảng điểm:\n"
+                    "1. Chọn một **môn học** trong thanh bên trái.\n"
+                    "2. Hệ thống sẽ hiện biểu đồ số lượng học sinh theo từng khoảng điểm.\n"
+                    "3. Dùng bộ lọc để phân tích sâu theo đơn vị, trường, lớp hoặc giới tính."
+                )
+            elif "lọc dữ liệu" in text or "giới tính" in text or "dân tộc" in text:
+                return (
+                    "🔍 Hướng dẫn lọc dữ liệu:\n"
+                    "1. Sử dụng **thanh bên trái** chọn đơn vị, trường, lớp, giới tính, dân tộc.\n"
+                    "2. Bảng dữ liệu và biểu đồ sẽ tự động cập nhật theo bộ lọc.\n"
+                    "👉 Giúp so sánh giữa các nhóm học sinh dễ dàng hơn."
+                )
+            elif "bắt đầu" in text or "hướng dẫn" in text:
+                return (
+                    "🚀 Cách sử dụng cơ bản:\n"
+                    "1. Chọn **bộ lọc** bên trái để lọc dữ liệu.\n"
+                    "2. Xem **bảng tổng hợp** và biểu đồ phân tích.\n"
+                    "3. Dùng **nút tải PDF** để xuất báo cáo nếu cần.\n"
+                    "Hãy thử chọn một câu hỏi gợi ý bên dưới nhé!"
+                )
+            elif "cách nhập dữ liệu" in text or "file" in text:
+                return (
+                    "🗂️ Cách nhập dữ liệu:\n"
+                    "1. Chuẩn bị file Excel hoặc CSV có các cột: DONVI, TRUONG, LOP, GT, DT và điểm các môn.\n"
+                    "2. Upload file lên hệ thống qua nút **Chọn file**.\n"
+                    "3. Hệ thống tự động đọc và hiển thị dữ liệu để bạn phân tích."
+                )
+            elif "các môn học" in text or "môn" in text:
+                return (
+                    "📚 Các môn phân tích:\n"
+                    "Hiện hệ thống hỗ trợ phân tích điểm các môn: Ngữ Văn, Toán, Tiếng Anh.\n"
+                    "Bạn có thể chọn môn để xem phân tích chi tiết từng môn."
+                )
+            elif "lỗi" in text or "vấn đề" in text:
+                return (
+                    "⚠️ Nếu gặp lỗi:\n"
+                    "1. Kiểm tra định dạng file đúng (.xlsx hoặc .csv).\n"
+                    "2. Đảm bảo các cột bắt buộc có trong file.\n"
+                    "3. Thử tải lại file hoặc liên hệ bộ phận hỗ trợ."
+                )
+            elif "xuất file excel" in text:
+                return (
+                    "📥 Hệ thống hiện chỉ hỗ trợ xuất báo cáo dạng PDF.\n"
+                    "Nếu bạn cần xuất Excel, vui lòng tải dữ liệu lọc dưới dạng CSV riêng."
+                )
+            else:
+                return (
+                    "🤖 Xin lỗi, tôi chưa hiểu rõ yêu cầu. Bạn có thể chọn câu hỏi gợi ý bên dưới hoặc hỏi lại rõ hơn nhé!"
+                )
+
+        # === Gợi ý câu hỏi thường gặp (mở rộng) ===
+        st.markdown("**📌 Hướng dẫn nhanh:**")
+        col1, col2 = st.columns(2)
+
+        if "prompt" not in st.session_state:
+            st.session_state.prompt = None
+
+        with col1:
+            if st.button("📄 Làm sao để tải PDF báo cáo?"):
+                st.session_state.prompt = "Tải báo cáo PDF"
+            elif st.button("📊 Xem điểm trung bình các môn"):
+                st.session_state.prompt = "Điểm trung bình các môn"
+            elif st.button("🗂️ Cách nhập dữ liệu?"):
+                st.session_state.prompt = "Cách nhập dữ liệu"
+
+        with col2:
+            if st.button("📚 Phân tích khoảng điểm môn học"):
+                st.session_state.prompt = "Phân tích khoảng điểm"
+            elif st.button("🔍 Hướng dẫn lọc"):
+                st.session_state.prompt = "Lọc dữ liệu"
+            elif st.button("⚠️ Gặp lỗi, sự cố khi sử dụng"):
+                st.session_state.prompt = "Lỗi sử dụng"
+
+        # Xử lý tin nhắn nếu có prompt
+        prompt = st.session_state.get("prompt", None)
+
+        if prompt:
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            reply = guide_bot_reply(prompt)
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            st.session_state.prompt = None  # Reset
+            st.rerun()
+           
