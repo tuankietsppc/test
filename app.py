@@ -510,7 +510,7 @@ if uploaded_file:
 
         # Thiết lập font và tiêu đề
         pdf.set_font("DejaVu", "B", 13)
-        pdf.cell(0, 12, "📊 Phân bố học sinh theo khoảng điểm KC của", ln=True, align="C")
+        pdf.cell(0, 12, "📊 Phân bố học sinh theo khoảng điểm KC", ln=True, align="C")
         pdf.ln(5)
 
         # Tạo biểu đồ sắc nét hơn
